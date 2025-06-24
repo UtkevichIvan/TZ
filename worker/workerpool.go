@@ -1,7 +1,7 @@
 package all
 
 import (
-	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -14,6 +14,7 @@ func Run(job JobDataToHandle) string {
 	case <-job.Stop:
 		return ""
 	case <-time.After(time.Minute * time.Duration(i)):
+		log.Println("The task with ID: ", job.Id, " has finished execution")
 		return job.InputData + job.Id
 	}
 }
@@ -68,11 +69,9 @@ func (p *Worker) worker(id int) {
 			if !ok {
 				return
 			}
-			fmt.Println("Worker", id, "processing")
 			p.jobStorage.MarkTaskAsProcessing(j.Id)
 			data := p.jobHandler(j)
 			p.jobStorage.MarkTaskAsDone(j.Id, data)
-			fmt.Println("Worker", id, "stop")
 		case <-p.stop:
 			return
 		}

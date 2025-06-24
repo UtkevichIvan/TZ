@@ -1,4 +1,4 @@
-package all
+package models
 
 const (
 	CreateStatus = "Create"

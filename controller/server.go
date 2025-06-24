@@ -1,18 +1,22 @@
-package all
+package controller
 
 import (
+	"TZ/models"
+	"TZ/worker"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
 type MyServer struct {
-	jobs         chan JobDataToHandle
-	wp           *Worker
+	jobs         chan all.JobDataToHandle
+	wp           *all.Worker
 	mux          *http.ServeMux
-	tasks        *Pool
+	tasks        *models.Pool
 	port         string
 	countWorkers int
-	sender       *Sender
+	sender       *all.Sender
 }
 
 func (s *MyServer) CreateTask(w http.ResponseWriter, r *http.Request) {
@@ -40,22 +44,21 @@ func (s *MyServer) DeleteTask(w http.ResponseWriter, r *http.Request) {
 
 func (s *MyServer) GetStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	data, err, ok := s.tasks.GetStatus(id)
+	data, ok := s.tasks.GetStatus(id)
 
 	if !ok {
 		http.Error(w, "There is no task with such ID", http.StatusBadRequest)
 		return
 	}
 
+	err := json.NewEncoder(w).Encode(data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatal(err)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
 }
 
-func (s *MyServer) GetResult(w http.ResponseWriter, r *http.Request) {
+func (s *MyServer) GetData(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	data := s.tasks.GetData(id)
 	if data == nil {
@@ -67,26 +70,27 @@ func (s *MyServer) GetResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func NewMyServer() *MyServer {
-	j := make(chan JobDataToHandle)
-	cW := 4
-	tasks := NewPool()
+	j := make(chan all.JobDataToHandle)
+	tasks := models.NewPool()
 	return &MyServer{
-		jobs:         j,
-		wp:           NewWorker(j, cW, tasks),
-		mux:          http.NewServeMux(),
-		tasks:        tasks,
-		port:         "8080",
-		countWorkers: cW,
-		sender:       NewSender(j),
+		jobs:   j,
+		wp:     all.NewWorker(j, 4, tasks),
+		mux:    http.NewServeMux(),
+		tasks:  tasks,
+		sender: all.NewSender(j),
 	}
 }
 
 func (s *MyServer) Start() {
-	go s.sender.Send()
+	go s.sender.Start()
 	s.mux.HandleFunc("/create", s.CreateTask)
 	s.mux.HandleFunc("/delete/{id}", s.DeleteTask)
 	s.mux.HandleFunc("/status/{id}", s.GetStatus)
-	s.mux.HandleFunc("/data/{id}", s.GetResult)
-	fmt.Println("Server is listening...")
-	http.ListenAndServe(":8080", s.mux)
+	s.mux.HandleFunc("/data/{id}", s.GetData)
+	log.Println("Server is listening...")
+	err := http.ListenAndServe(":8080", s.mux)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 }

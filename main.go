@@ -1,10 +1,10 @@
 package main
 
 import (
-	"TZ/all"
+	"TZ/controller"
 )
 
 func main() {
-	ser := all.NewMyServer()
+	ser := controller.NewMyServer()
 	ser.Start()
 }
